@@ -30,17 +30,15 @@ Datasets:
 ### Prerequisites
 
 ```
-python==3.7.12
-torch==2.0.0
-torch-cluster==1.6.1
-torch-geometric==2.3.1
-torch-scatter==2.1.1
-torch-sparse==0.6.17
-torch-spline-conv==1.2.2
-numpy==1.23.5
-networkx==2.8.4
-scipy==1.7.3
-ogb==1.3.6
+python==3.8.18
+torch==1.13.1+cu116
+torch-geometric==2.4.0 
+torch-scatter==2.1.1+pt113cu116
+torchvision==0.14.1+cu116 
+scikit-learn==1.3.0 
+numpy==1.22.3
+networkx==3.1
+dgl-cuda11.6==0.9.1  
 ```
 
 Make sure that the environment is set up before the experiment.
