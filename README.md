@@ -43,13 +43,6 @@ dgl-cuda11.6==0.9.1
 
 Make sure that the environment is set up before the experiment.
 
-Experiments preparation:
-before experiments, you should use the following script firstly:
-```
-# make sure under ex_scripts Dir
-bash preparation.sh
-```
-
 ### Effectiveness and Efficiency Evaluation
 
 For our solution, We tested the effectiveness and efficiency of SCS-GMN on all datasets.
