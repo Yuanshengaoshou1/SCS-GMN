@@ -80,17 +80,13 @@ class scs_GMN(torch.nn.Module):
         #self.decoder_t = decoder(graph_size = self.da_size)
         #self.predict_layer = predict_layer(q_size=self.q_size,da_size=self.da_size,D=self.GCN_out_size)
 
-    def forward(self, target_adj,adj_matrix_da, node_features_da,query_adj,adj_matrix_q, node_features_q,candidate_set, candidate_adj,threshold):  # b_same bx5x8 #feat=graph.ndata['x']
+    def forward(self, target_adj, node_features_da,query_adj, node_features_q,candidate_set, candidate_adj,threshold):  # b_same bx5x8 #feat=graph.ndata['x']
 
         # 1-layer
         da1 = self.GCN1_da(target_adj, node_features_da) # 18xD
         da1 = torch.nn.functional.leaky_relu(da1)
         q1 = self.GCN1_q(query_adj, node_features_q) # 9xD
         q1 = torch.nn.functional.leaky_relu(q1)
-        #da1 = self.GCN1(adj_matrix_da, node_features_da)  # 18xD
-        #q1 = self.GCN1(adj_matrix_q, node_features_q)  # 9xD
-        #da1 = self.GAT1(adj_matrix_da,node_features_da)
-        #q1 = self.GAT1(adj_matrix_q,node_features_q)
         #c1 = self.cross1(query_embedding=q1, target_embedding=da1,candidate_nodes=candidate_set,candidate_adj=candidate_adj)  # c1 60x400
         c1 = self.cross1(query_embedding=q1, target_embedding=da1, candidate_nodes=candidate_set,
                          candidate_adj=candidate_adj
@@ -192,15 +188,6 @@ class scs_GMN(torch.nn.Module):
         #overlap_to_candidate = list(set(candidate_set) & set(predict_nodes))
         overlap_to_candidate = list(set(predict_nodes))
 
-        #get negative sample
-        sample_size = len(overlap_to_candidate)
-        sample_size = 0
-        total_nodes_set = set(self.target_all_nodes)
-        pos_nodes_set = set(overlap_to_candidate)
-        neg_nodes_set = total_nodes_set - pos_nodes_set
-        neg_nodes = list(neg_nodes_set)
-        sampled_neg_nodes = random.sample(neg_nodes, sample_size)
-
         # reconstruct adj
         for_rec_features = att_da2[overlap_to_candidate]
         # inner product for target graph
@@ -212,20 +199,14 @@ class scs_GMN(torch.nn.Module):
         nor_re_adj = torch.nn.functional.normalize(re_sub_adj, p=2, dim=1)
         #nor_re_adj = torch.sigmoid(re_sub_adj)
         #print('nor_re_adj',nor_re_adj)
-        # reconstruct negative adj
-        for_rec_neg_features = att_da2[sampled_neg_nodes]
-        re_neg_adj = torch.matmul(for_rec_neg_features, torch.transpose(for_rec_neg_features, 0, 1))
-        nor_neg_adj = torch.nn.functional.normalize(re_neg_adj,p=2,dim=1)
+
         #nor_neg_adj = torch.sigmoid(re_neg_adj)
         # orignal target adj
         sub_adj = target_adj[overlap_to_candidate]
         ori_sub_adj = sub_adj[:, overlap_to_candidate]
-        # negative
-        sub_neg_adj = target_adj[sampled_neg_nodes]
-        ori_neg_adj = sub_neg_adj[:,sampled_neg_nodes]
+
         # target graph-based filter
         nor_re_adj = torch.mul(nor_re_adj,ori_sub_adj)
-        nor_neg_adj = torch.mul(nor_neg_adj,ori_neg_adj)
 
         # get target graph degree\node number(indirect) approximation
         if len(overlap_to_candidate) != 0:
@@ -247,24 +228,9 @@ class scs_GMN(torch.nn.Module):
         else:
             pre_density = 0
 
-        # get nagative degree\node number(indirect) approximation
-        sum_neg_adj = torch.sum(nor_neg_adj, dim=1)
-        neg_avg_degree = torch.mean(sum_neg_adj)
-        if torch.isnan(neg_avg_degree):
-            neg_avg_degree = 0
-        neg_avg_edges = torch.sum(nor_neg_adj)
-        if torch.isnan(neg_avg_edges):
-            neg_avg_edges = 0
-        neg_avg_nodes = torch.trace(nor_neg_adj)
-        if torch.isnan(neg_avg_nodes):
-            neg_avg_nodes = 0
-        #print('neg_avg_degree',neg_avg_degree)
-        #print('neg_avg_edges',neg_avg_edges)
 
         return end, att_da2, att_q2, \
-                   pre_avg_degree,pre_density,pre_avg_nodes,\
-               neg_avg_degree,neg_avg_edges,neg_avg_nodes,\
-               nor_re_adj,ori_sub_adj
+                   pre_avg_degree,pre_density,pre_avg_nodes
         #return end, da1, c1, h1_da, att_da1, att_q1, da2, c2, h2_da, att_da2, att_q2
 
 

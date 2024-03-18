@@ -30,38 +30,34 @@ def remove_dumb_nodes(adj):
     return torch.tensor(removed_adj_add_self)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', type=str, default='cora')
-parser.add_argument('--GCN_in_size', type=int, default=1437)
-parser.add_argument('--GCN_out_size', type=int, default=2)
-parser.add_argument('--da_size', type=int, default=2)
+parser.add_argument('--dataset', type=str, default='cora') # cora/citeseer/pubmed/deezer/facebook
+parser.add_argument('--cs_perturbation', type=float, default=0.1) # 0.1/0.2/0.3
+parser.add_argument('--GCN_out_size', type=int, default=256)
 parser.add_argument('--batch_size', type=int, default=2)
 parser.add_argument('--test_size', type=int, default=2)
-parser.add_argument('--candidate_method', type=str, default='faster_coreness',help='faster_coreness or for large graph')
+parser.add_argument('--candidate_method', type=str, default='faster_coreness',help='faster_coreness/for_large_graph')
 parser.add_argument('--epoch', type=int, default=1)
 parser.add_argument('--trade_off_for_re1', type=float, default=1,help='balance joint loss')
 parser.add_argument('--trade_off_for_re2', type=float, default=0.001,help='balance joint loss')
 parser.add_argument('--trade_off_for_re3', type=float, default=0.01,help='balance joint loss')
-parser.add_argument('--model_path', type=str)
-
+parser.add_argument('--train_type', type=str, default='both',help='both/only label/only structure')
+parser.add_argument('--save_model', type=str, default=False,help='save model')
+parser.add_argument('--model_path', type=str,help='the path of saved model')
 args = parser.parse_args()
 
-GCN_in_size = 4718  # features_dimension cora 1433/Citeseer 3703/pubmed 500/deezer 4463/facebook 4714
-GCN_out_size = 256
-da_size = 22470  # Cora 2708/Citeseer 3312/pubmed 19717/deezer 28281/facebook 22470
 threshold = 1
-
 # data
-test_path = './dataset/' + args.dataset +'/for_test_' + args.dataset + '/'
+test_path = './dataset/' + args.dataset +'/for_test_' + args.dataset + '/' + str(args.cs_perturbation) + '/'
 test_size = args.test_size
 epoch = args.epoch
 candidate_method = args.candidate_method  # degree\coreness\faster_coreness\rough_faster_coreness\for_large_graph
-save_model = True
+save_model = False
 trade_off_for_re1 = args.trade_off_for_re1
 trade_off_for_re2 = args.trade_off_for_re2
 trade_off_for_re3 = args.trade_off_for_re3
 #device = torch.device('cuda:1')
 
-model_path = './model_save/GMN_for_cora/GMN_for_cora_200.pth'
+# model_path = './model_save/GMN_for_cora/GMN_for_cora_200.pth'
 
 
 test_target_features = torch.load(test_path + 'nor_target_features_cat_degree_cluster_h_index_coreness.pt')
@@ -69,11 +65,10 @@ test_target_features_to_tensor = torch.tensor(test_target_features[0])
 #test_target_features_to_tensor = test_target_features_to_tensor.to(device)
 test_target_adj = torch.load(test_path + 'target_adj.pt')
 test_target_adj_to_tensor = torch.tensor(test_target_adj[0])
+target_size = test_target_adj_to_tensor.shape[0]
 # = test_target_adj_to_tensor.to(device)
-test_target_att_adj = torch.load(test_path + 'degree_based_target_adjs.pt')
 test_query_features = torch.load(test_path + 'nor_0.7_query_features_cat_degree_cluster_h_index_coreness.pt')
 test_query_adj = torch.load(test_path + 'query_adj.pt')
-test_query_att_adj = torch.load(test_path + 'degree_based_query_adjs.pt')
 test_data_size = int(test_query_features.shape[0])
 
 testdata = []
@@ -85,9 +80,8 @@ for i in range(int(test_query_features.shape[0])):
     # one_testdata.append(test_target_adj[i])
     one_testdata.append(test_query_features[i])
     one_testdata.append(test_query_adj[i])
-    # one_testdata.append(test_target_att_adj[i])
-    one_testdata.append(test_query_att_adj[i])
     testdata.append(one_testdata)
+    in_size = test_query_features[i].shape[1]
 
 data_test = DataLoader(testdata, batch_size=test_size, shuffle=True)
 
@@ -97,8 +91,8 @@ GCN_out_size = args.GCN_out_size
 da_size = target_size # target size Cora 2708/Citeseer 3312/pubmed 19717/deezer 28281/facebook 22470
 
 # model
-model = scs_GMN(GCN_in_size, GCN_out_size, da_size, threshold)
-model.load_state_dict(torch.load(model_path))
+model = scs_GMN(GCN_in_size, GCN_out_size, da_size)
+model.load_state_dict(torch.load(args.model_path))
 model.eval()  # 切换为测试模式
 
 #model.to(device)
@@ -107,8 +101,6 @@ model.eval()  # 切换为测试模式
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)  # Adam会自动调整学习率
 loss_fun1 = torch.nn.MSELoss(reduction='mean')
 #loss_fun1 = loss_fun1.to(device)
-triplet_loss = torch.nn.TripletMarginLoss(reduction='mean')
-crossentropyloss = torch.nn.CrossEntropyLoss(reduction='mean')
 l1_loss = torch.nn.L1Loss(reduction='mean')
 #l1_loss = l1_loss.to(device)
 
@@ -141,6 +133,7 @@ for i in np.arange(epoch):
     model.eval()  # test
 
     # plt
+    # for community similarity
     mean_similarity_value = 0
     mean_com_density = 0
     mean_com_coreness = 0
@@ -151,6 +144,7 @@ for i in np.arange(epoch):
     mean_predict_avg_coreness = 0
     mean_query_nodes = 0
     mean_predict_nodes = 0
+    # others
     mean_f1_score = 0
     mean_query_tpr = 0
     mean_predict_tpr = 0
@@ -169,13 +163,8 @@ for i in np.arange(epoch):
         test_query_adjs = test_batch[1]
         #test_query_adjs = test_query_adjs.to(device)
 
-        # test_target_att_adjs = test_batch[5]
-        test_query_att_adjs = test_batch[2]
-        # test_query_att_adjs = test_query_att_adjs.to(device)
-
         test_all_y_hat = torch.zeros(test_size, 1, da_size)
-        test_target_graph_embedding = torch.zeros(test_size, 1, GCN_out_size)
-        test_query_graph_embedding = torch.zeros(test_size, 1, GCN_out_size)
+
         # reconstruct loss
         # test_reconstruct_query_adj = torch.empty(test_size, q_size, q_size)
         # test_reconstruct_target_adj = torch.empty(test_size, da_size, da_size)
@@ -191,9 +180,7 @@ for i in np.arange(epoch):
         test_reconstruct_degree_from_query = torch.zeros(test_size, 1)
         test_reconstruct_edges_from_query = torch.zeros(test_size, 1)
         test_reconstruct_nodes_from_query = torch.zeros(test_size, 1)
-        # negatigve samples
-        test_reconstruct_degree_from_neg = torch.zeros(test_size, 1)
-        test_reconstruct_edges_from_neg = torch.zeros(test_size, 1)
+
         test_batch_adj_loss = torch.zeros(1, 1)
         #test_batch_adj_loss = test_batch_adj_loss.to(device)
         for y in range(test_query_features.shape[0]):  # one batch
@@ -225,14 +212,12 @@ for i in np.arange(epoch):
             #test_candidate_adj = test_candidate_adj.to(device)
             start_test = time.time()
             with torch.no_grad():
-                # get degree_dis based adj
-                test_att_target_adj = torch.tensor(test_target_att_adj[0])
-                test_att_query_adj = test_query_att_adjs[y]
+
                 test_y_hat, att_da2, att_q2, \
-                test_avg_degree, test_density, test_avg_nodes, test_neg_avg_degree, test_neg_avg_edges, test_neg_avg_nodes, test_re_adj, test_ori_adj \
-                    = model(test_target_adj_to_tensor, test_att_target_adj,
+                test_avg_degree, test_density, test_avg_nodes\
+                    = model(test_target_adj_to_tensor,
                             test_target_features_to_tensor,
-                            test_query_adjs[y], test_att_query_adj, test_query_features[y],
+                            test_query_adjs[y], test_query_features[y],
                             test_candidate_set, test_candidate_adj, threshold)
                 end_test = time.time() - start_test
                 all_test_time = all_test_time + end_test
@@ -240,8 +225,6 @@ for i in np.arange(epoch):
                 test_reconstruct_degree[y] = test_avg_degree
                 test_reconstruct_edges[y] = test_density
                 test_reconstruct_nodes[y] = test_avg_nodes
-                test_reconstruct_degree_from_neg[y] = test_neg_avg_degree
-                test_reconstruct_edges_from_neg[y] = test_neg_avg_edges
                 #test_re_adj = test_re_adj.to(device)
                 #test_ori_adj = test_ori_adj.to(device)
 
@@ -249,8 +232,8 @@ for i in np.arange(epoch):
                 # test_reconstruct_target_adj[y] = re_target_adj
                 # test_reconstruct_query_adj[y] = re_query_adj
                 # reconstruct adj loss
-                test_re_adj_loss = loss_fun1(test_re_adj, test_ori_adj)
-                test_batch_adj_loss = test_batch_adj_loss + test_re_adj_loss
+                # test_re_adj_loss = loss_fun1(test_re_adj, test_ori_adj)
+                # test_batch_adj_loss = test_batch_adj_loss + test_re_adj_loss
 
                 # remove dumb nodes
                 remove_dumb_adj = remove_dumb_nodes(test_query_adjs[y])

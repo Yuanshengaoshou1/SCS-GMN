@@ -2,12 +2,13 @@ import torch
 import numpy as np
 import random
 
-train_path = './dataset/for_train_cora/0_3/'
-test_path = './dataset/for_case_pubmed/'
-pickle_protocol = 4
-query_features = torch.load(test_path+'query_features.pt')
+# train_path = './dataset/for_train_cora/0_3/'
+# test_path = './dataset/for_case_pubmed/'
+# pickle_protocol = 4
+# query_features = torch.load(test_path+'query_features.pt')
 
-def process_to_masked_features(data_path,all_query_features,masked_range=0.5):
+def process_to_masked_features(data_path,all_query_features,masked_range=0.7):
+    pickle_protocol = 4
     masked_query_features = []
     for i in range(all_query_features.shape[0]):
         query_features = all_query_features[i]
@@ -26,4 +27,4 @@ def process_to_masked_features(data_path,all_query_features,masked_range=0.5):
     fin_query_features = np.array(masked_query_features)
     torch.save(fin_query_features,data_path+'masked_'+str(masked_range)+'_query_features.pt',pickle_protocol=pickle_protocol)
 
-process_to_masked_features(test_path,query_features,0.7)
+#process_to_masked_features(test_path,query_features,0.7)

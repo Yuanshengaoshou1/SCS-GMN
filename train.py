@@ -59,30 +59,29 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', type=str, default='cora')
-parser.add_argument('--GCN_in_size', type=int, default=1437)
-parser.add_argument('--GCN_out_size', type=int, default=2)
-parser.add_argument('--da_size', type=int, default=2)
+parser.add_argument('--dataset', type=str, default='cora') # cora/citeseer/pubmed/deezer/facebook
+parser.add_argument('--cs_perturbation', type=float, default=0.1) # 0.1/0.2/0.3
+parser.add_argument('--GCN_out_size', type=int, default=256)
 parser.add_argument('--batch_size', type=int, default=2)
 parser.add_argument('--test_size', type=int, default=2)
-parser.add_argument('--candidate_method', type=str, default='faster_coreness',help='faster_coreness or for large graph')
+parser.add_argument('--candidate_method', type=str, default='faster_coreness',help='faster_coreness/for_large_graph')
 parser.add_argument('--epoch', type=int, default=200)
 parser.add_argument('--trade_off_for_re1', type=float, default=1,help='balance joint loss')
 parser.add_argument('--trade_off_for_re2', type=float, default=0.001,help='balance joint loss')
 parser.add_argument('--trade_off_for_re3', type=float, default=0.01,help='balance joint loss')
-parser.add_argument('--train_type', type=str, default='both',help='both,only label,only structure')
+parser.add_argument('--train_type', type=str, default='both',help='both/only label/only structure')
+parser.add_argument('--save_model', type=str, default=False,help='save model')
 args = parser.parse_args()
 
 threshold = 1
 # data
-train_path = './dataset/'+ args.dataset +'/for_train_' + args.dataset + '/' # ./dataset/for_train_4_17/\./dataset/for_train_cora/
-test_path = './dataset/' + args.dataset +'/for_test_' + args.dataset + '/'
+train_path = './dataset/'+ args.dataset +'/for_train_' + args.dataset + '/' + str(args.cs_perturbation) + '/' # ./dataset/for_train_4_17/\./dataset/for_train_cora/
+test_path = './dataset/' + args.dataset +'/for_test_' + args.dataset + '/' + str(args.cs_perturbation) + '/'
 batch_size = args.batch_size
-test_size = args.test_size # 自建数据集 test_size=40 cora数据集 test_size=20
+test_size = args.test_size
 epoch = args.epoch
 #device = torch.device('cuda:1')
 candidate_method = args.candidate_method  # degree\coreness\faster_coreness\rough_faster_coreness\for_large_graph
-save_model = True
 trade_off_for_re1 = args.trade_off_for_re1
 trade_off_for_re2 = args.trade_off_for_re2
 trade_off_for_re3 = args.trade_off_for_re3
@@ -95,11 +94,9 @@ train_target_adj = torch.load(train_path + 'target_adj.pt')
 train_target_adj_to_tensor = torch.tensor(train_target_adj[0])
 target_size = train_target_adj_to_tensor.shape[0]
 #train_target_adj_to_tensor = train_target_adj_to_tensor.to(device)
-train_target_att_adj = torch.load(train_path + 'degree_based_target_adjs.pt')
 train_query_features = torch.load(train_path + 'nor_0.7_query_features_cat_degree_cluster_h_index_coreness.pt')
 # train_query_structure_features = torch.load(train_path + 'nor_query_only_degree_cluster_h_index_coreness')
 train_query_adj = torch.load(train_path + 'query_adj.pt')
-train_query_att_adj = torch.load(train_path + 'degree_based_query_adjs.pt')
 train_labels = torch.load(train_path + 'labels.pt')
 # print(train_labels.shape)
 
@@ -109,17 +106,14 @@ test_target_features_to_tensor = torch.tensor(test_target_features[0])
 test_target_adj = torch.load(test_path + 'target_adj.pt')
 test_target_adj_to_tensor = torch.tensor(test_target_adj[0])
 #test_target_adj_to_tensor = test_target_adj_to_tensor.to(device)
-test_target_att_adj = torch.load(test_path + 'degree_based_target_adjs.pt')
 test_query_features = torch.load(test_path + 'nor_0.7_query_features_cat_degree_cluster_h_index_coreness.pt')
 test_query_adj = torch.load(test_path + 'query_adj.pt')
-test_query_att_adj = torch.load(test_path + 'degree_based_query_adjs.pt')
 test_labels = torch.load(test_path + 'labels.pt')
 test_data_size = int(test_query_features.shape[0])
 
 traindata = []
 testdata = []
 
-# print(train_target_features.shape[0]) #shape[0]可以取出第一维的长度
 for i in range(int(train_query_features.shape[0])):
     one_traindata = []
     # one_traindata.append(train_target_features[i])
@@ -127,8 +121,6 @@ for i in range(int(train_query_features.shape[0])):
     one_traindata.append(train_query_features[i])
     one_traindata.append(train_query_adj[i])
     one_traindata.append(train_labels[i])
-    # one_traindata.append(train_target_att_adj[i])
-    one_traindata.append(train_query_att_adj[i])
     traindata.append(one_traindata)
 
 # prepare test data
@@ -139,8 +131,6 @@ for i in range(int(test_query_features.shape[0])):
     one_testdata.append(test_query_features[i])
     one_testdata.append(test_query_adj[i])
     one_testdata.append(test_labels[i])
-    # one_testdata.append(test_target_att_adj[i])
-    one_testdata.append(test_query_att_adj[i])
     testdata.append(one_testdata)
     in_size = test_query_features[i].shape[1]
 
@@ -161,8 +151,6 @@ model = scs_GMN(GCN_in_size, GCN_out_size,  da_size)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Adam会自动调整学习率
 loss_fun1 = torch.nn.MSELoss(reduction='mean')
 #loss_fun1 = loss_fun1.to(device)
-triplet_loss = torch.nn.TripletMarginLoss(reduction='mean')
-crossentropyloss = torch.nn.CrossEntropyLoss(reduction='mean')
 l1_loss = torch.nn.L1Loss(reduction='mean')
 #l1_loss = l1_loss.to(device)
 
@@ -189,8 +177,8 @@ for i in np.arange(epoch):
     print('epoch:  ', i)
     epoch_loss = []
     start = time.time()
-    model.train()  # 切换训练模式
-    for j, batch in enumerate(data_loader):  # j为索引，一个batch
+    model.train()  # change to train
+    for j, batch in enumerate(data_loader):  # j is a batch index
         # print(batch[1].shape) batch[1].shape -> [batch_size,number_of_nodes,features_dimension]
         # for item in batch[1]:
         #     print(item.shape)
@@ -204,8 +192,6 @@ for i in np.arange(epoch):
         #b_query_adjs = b_query_adjs.to(device)
         b_labels = batch[2]
         #b_labels = b_labels.to(device)
-        # b_target_att_adjs = batch[5]
-        b_query_att_adjs = batch[3]
 
         # print('b_target_features :', b_target_features[0].shape)
         # print('b_target_adjs :', b_target_adjs[0].shape)
@@ -215,16 +201,12 @@ for i in np.arange(epoch):
         # print('b_query_adjs',b_query_adjs.shape)
 
         predicted_y_hat = torch.zeros(batch_size, 1, da_size)
-        target_graph_embedding = torch.zeros(batch_size, 1, GCN_out_size)
-        query_graph_embedding = torch.zeros(batch_size, 1, GCN_out_size)
+
         # reconstruct loss
         # reconstruct_query_adj = torch.empty(batch_size,q_size,q_size)
         # reconstruct_target_adj = torch.empty(batch_size,da_size,da_size)
         # predicted_adj = torch.empty(batch_size,q_size,q_size)
-        # triplet loss
-        batch_positive_samples = []
-        batch_negative_samples = []
-        batch_anchor_samples = []
+
         # reconstruct structural information loss
         reconstruct_degree = torch.zeros(batch_size, 1)
         reconstruct_edges = torch.zeros(batch_size, 1)
@@ -232,10 +214,7 @@ for i in np.arange(epoch):
         reconstruct_degree_from_query = torch.zeros(batch_size, 1)
         reconstruct_edges_from_query = torch.zeros(batch_size, 1)
         reconstruct_nodes_from_query = torch.zeros(batch_size, 1)
-        reconstruct_degree_from_neg = torch.zeros(batch_size, 1)
-        reconstruct_edges_from_neg = torch.zeros(batch_size, 1)
-        batch_re_adj_loss = torch.zeros(1, 1)
-        #batch_re_adj_loss = batch_re_adj_loss.to(device)
+
         for k in range(b_query_features.shape[0]):
             # print('k',k)
             start_candidate = time.time()
@@ -260,51 +239,25 @@ for i in np.arange(epoch):
             ###################print candidate time
             end_candidate = time.time() - start_candidate
             all_train_candidate_time = all_train_candidate_time + end_candidate
-            # print("候选选择时间:%.2f秒" % (end_candidate - start_candidate),k)
-            # get degree_dis based adj
-            att_target_adj = torch.tensor(train_target_att_adj[0])
-            att_query_adj = b_query_att_adjs[k]
+
             # model
             y_hat, att_da2, att_q2, \
-            avg_degree, density, avg_nodes, neg_avg_degree, neg_density, neg_avg_nodes, re_adj, ori_adj = \
-                model(train_target_adj_to_tensor, att_target_adj, train_target_features_to_tensor,
-                      b_query_adjs[k], att_query_adj, b_query_features[k], candidate_set, candidate_adj, threshold)
+            avg_degree, density, avg_nodes = \
+                model(train_target_adj_to_tensor, train_target_features_to_tensor,
+                      b_query_adjs[k], b_query_features[k], candidate_set, candidate_adj, threshold)
             # q1,q2是一张查询图的图节点嵌入
             # att_da1,att_da2是一张目标图的图节点嵌入
             predicted_y_hat[k] = y_hat
             reconstruct_degree[k] = avg_degree
             reconstruct_edges[k] = density
             reconstruct_nodes[k] = avg_nodes
-            reconstruct_degree_from_neg[k] = neg_avg_degree
-            reconstruct_edges_from_neg[k] = neg_density
-            #re_adj = re_adj.to(device)
-            #ori_adj = ori_adj.to(device)
+
             # get reconstruct adj
             # reconstruct_target_adj[k] = re_target_adj
             # reconstruct_query_adj[k] = re_query_adj
             # reconstruct adj loss
-            re_adj_loss = loss_fun1(re_adj, ori_adj)
-            batch_re_adj_loss = batch_re_adj_loss + re_adj_loss
-
-            # degree weight sum
-            target_degree = torch.sum(train_target_adj_to_tensor, dim=1)[candidate_set]
-            # print('target_degree',target_degree)
-            query_degree = torch.sum(b_query_adjs[k], dim=1)
-            sum_target_degree = int(torch.sum(target_degree, dim=0))
-            # print('sum_target_degree',sum_target_degree)
-            sum_query_degree = int(torch.sum(query_degree, dim=0))
-            nor_target_degree = torch.div(target_degree, sum_target_degree).float()  # 1xN
-            nor_query_degree = torch.div(query_degree, sum_query_degree).float()  # 1xN
-            # print('nor_target_degree.shape',nor_target_degree.shape)
-            # print('nor_target_degree',nor_target_degree)
-
-            # get pooled graph embedding
-            # pool_target_graph_embedding = torch.mean(att_da2[candidate_set],dim=0)
-            # pool_query_graph_embedding = torch.mean(att_q2,dim=0)
-            pool_target_graph_embedding = torch.matmul(nor_target_degree, att_da2[candidate_set])
-            pool_query_graph_embedding = torch.matmul(nor_query_degree, att_q2)
-            target_graph_embedding[k] = pool_target_graph_embedding
-            query_graph_embedding[k] = pool_query_graph_embedding
+            # re_adj_loss = loss_fun1(re_adj, ori_adj)
+            # batch_re_adj_loss = batch_re_adj_loss + re_adj_loss
 
             # get query avg degree and query avg edges
             # nor_query_adj = torch.nn.functional.normalize(b_query_adjs[k],p=2,dim=1)
@@ -345,20 +298,11 @@ for i in np.arange(epoch):
         re_loss3 = l1_loss(reconstruct_nodes, reconstruct_nodes_from_query)
         print('re_loss1', re_loss1)
         print('re_loss2', re_loss2)
-        mean_re_adj_loss = torch.div(batch_re_adj_loss, batch_size)
-        # loss2 = loss_fun1(target_graph_embedding,query_graph_embedding)
+
         # reconstruct loss
         # reconstruct_query_loss = loss_fun1(reconstruct_query_adj,b_query_adjs.float())
         # reconstruct_target_loss = loss_fun1(reconstruct_target_adj,b_target_adjs.float())
-        # tri_loss = triplet_loss(re_anchor_samples,re_positive_samples,re_negative_samples)
-        # csloss = crossentropyloss(predicted_y_hat,b_labels)
 
-        # total_loss = loss1 + 0.1 * loss2
-        # total_loss = loss1 + tri_loss
-        # total_loss = loss1 + re_loss1 + re_loss2 + mean_re_adj_loss
-        # for cora re1 - 0.01 re2 - 0.0001
-        # for citeseer re1 - 0.01 re2 - 0.0001
-        # total_loss = loss1 + 0.01*re_loss1 + 0.0001*re_loss2
         print('re_loss3', re_loss3)
         if args.train_type == 'both':
             if i < 100:
@@ -407,20 +351,8 @@ for i in np.arange(epoch):
         #test_query_adjs = test_query_adjs.to(device)
         test_labels = test_batch[2]
         #test_labels = test_labels.to(device)
-        # test_target_att_adjs = test_batch[5]
-        test_query_att_adjs = test_batch[3]
-        # test_query_att_adjs = test_query_att_adjs.to(device)
 
         test_all_y_hat = torch.zeros(test_size, 1, da_size)
-        test_target_graph_embedding = torch.zeros(test_size, 1, GCN_out_size)
-        test_query_graph_embedding = torch.zeros(test_size, 1, GCN_out_size)
-        # reconstruct loss
-        # test_reconstruct_query_adj = torch.empty(test_size, q_size, q_size)
-        # test_reconstruct_target_adj = torch.empty(test_size, da_size, da_size)
-
-        batch_positive_samples_for_test = []
-        batch_negative_samples_for_test = []
-        batch_anchor_samples_for_test = []
 
         # reconstruct structural information
         test_reconstruct_degree = torch.zeros(test_size, 1)
@@ -429,10 +361,7 @@ for i in np.arange(epoch):
         test_reconstruct_degree_from_query = torch.zeros(test_size, 1)
         test_reconstruct_edges_from_query = torch.zeros(test_size, 1)
         test_reconstruct_nodes_from_query = torch.zeros(test_size, 1)
-        # negatigve samples
-        test_reconstruct_degree_from_neg = torch.zeros(test_size, 1)
-        test_reconstruct_edges_from_neg = torch.zeros(test_size, 1)
-        test_batch_adj_loss = torch.zeros(1, 1)
+
         #test_batch_adj_loss = test_batch_adj_loss.to(device)
         for y in range(test_query_features.shape[0]):  # one batch
             # get candidate
@@ -464,14 +393,10 @@ for i in np.arange(epoch):
             #test_candidate_adj = test_candidate_adj.to(device)
             start_test = time.time()
             with torch.no_grad():
-                # get degree_dis based adj
-                test_att_target_adj = torch.tensor(test_target_att_adj[0])
-                test_att_query_adj = test_query_att_adjs[y]
                 test_y_hat, att_da2, att_q2, \
-                test_avg_degree, test_density, test_avg_nodes, test_neg_avg_degree, test_neg_density, test_neg_avg_nodes, test_re_adj, test_ori_adj \
-                    = model(test_target_adj_to_tensor, test_att_target_adj,
+                test_avg_degree, test_density, test_avg_nodes = model(test_target_adj_to_tensor,
                             test_target_features_to_tensor,
-                            test_query_adjs[y], test_att_query_adj, test_query_features[y],
+                            test_query_adjs[y], test_query_features[y],
                             test_candidate_set, test_candidate_adj, threshold)
                 end_test = time.time() - start_test
                 all_test_time = all_test_time + end_test
@@ -479,8 +404,7 @@ for i in np.arange(epoch):
                 test_reconstruct_degree[y] = test_avg_degree
                 test_reconstruct_edges[y] = test_density
                 test_reconstruct_nodes[y] = test_avg_nodes
-                test_reconstruct_degree_from_neg[y] = test_neg_avg_degree
-                test_reconstruct_edges_from_neg[y] = test_neg_density
+
                 #test_re_adj = test_re_adj.to(device)
                 #test_ori_adj = test_ori_adj.to(device)
 
@@ -488,33 +412,8 @@ for i in np.arange(epoch):
                 # test_reconstruct_target_adj[y] = re_target_adj
                 # test_reconstruct_query_adj[y] = re_query_adj
                 # reconstruct adj loss
-                test_re_adj_loss = loss_fun1(test_re_adj, test_ori_adj)
-                test_batch_adj_loss = test_batch_adj_loss + test_re_adj_loss
-
-                # degree weight sum
-                test_target_degree = torch.sum(test_target_adj_to_tensor, dim=1)[test_candidate_set]
-                test_query_degree = torch.sum(test_query_adjs[y], dim=1)
-                test_sum_target_degree = int(torch.sum(test_target_degree, dim=0))
-                test_sum_query_degree = int(torch.sum(test_query_degree, dim=0))
-                test_nor_target_degree = torch.div(test_target_degree, test_sum_target_degree).float()
-                test_nor_query_degree = torch.div(test_query_degree, test_sum_query_degree).float()
-
-                # test_pool_target_graph_embedding = torch.mean(att_da2[test_candidate_set],dim=0)
-                # test_pool_query_graph_embedding = torch.mean(att_q2,dim=0)
-                test_pool_target_graph_embedding = torch.matmul(test_nor_target_degree, att_da2[test_candidate_set])
-                test_pool_query_graph_embedding = torch.matmul(test_nor_query_degree, att_q2)
-                test_target_graph_embedding[y] = test_pool_target_graph_embedding
-                test_query_graph_embedding[y] = test_pool_query_graph_embedding
-
-                # sample
-                # positive_samples = select_positive_sample(test_labels[y], att_da2, sample_size, test_target_adjs[y],
-                #                                           test_query_adjs[y])
-                # negative_samples = select_negative_sample(test_labels[y], att_da2, sample_size, test_target_adjs[y],
-                #                                           test_query_adjs[y])
-                # anchor_samples = att_q2.repeat_interleave(sample_size, dim=0)
-                # batch_positive_samples_for_test.append(positive_samples)
-                # batch_negative_samples_for_test.append(negative_samples)
-                # batch_anchor_samples_for_test.append(anchor_samples)
+                # test_re_adj_loss = loss_fun1(test_re_adj, test_ori_adj)
+                # test_batch_adj_loss = test_batch_adj_loss + test_re_adj_loss
 
                 # get query avg degree and query avg edges
                 # nor_test_query_adj = torch.nn.functional.normalize(test_query_adjs[y], p=2, dim=1)
@@ -541,13 +440,6 @@ for i in np.arange(epoch):
                 test_reconstruct_degree_from_query[y] = float(avg_degree_from_query)
                 test_reconstruct_edges_from_query[y] = float(density_from_query)
                 test_reconstruct_nodes_from_query[y] = float(avg_nodes_from_query)
-                # plt query adj and reconstruct adj
-                # if (i + 1) % 20 == 0 and x==0 and y==0 or i == 0 and x==0 and y==0:
-                #     plt_adj_in_hot(test_re_adj)
-                #     plt_adj_in_hot(test_ori_adj)
-                #     print('mean_gap', test_avg_degree - avg_degree_from_query)
-
-                # './dataset/2023.6.21/cora_dataset/', y_hat, q_size, da_size, i, j, k,save_matching_matrix
 
                 # test community similarity
                 similarity_value, com_density, com_coreness, com_nodes = community_similarity(test_target_adj_to_tensor,
@@ -585,16 +477,6 @@ for i in np.arange(epoch):
                 # label cover rate
                 mean_cover_rate = mean_cover_rate + predicted_cover_rate
 
-        # triplet loss for test
-        # batch_positive_samples_toTensor_for_test = torch.stack(batch_positive_samples_for_test)
-        # batch_negative_samples_toTensor_for_test = torch.stack(batch_negative_samples_for_test)
-        # batch_anchor_samples_toTensor_for_test = torch.stack(batch_anchor_samples_for_test)
-        # re_positive_samples_for_test = torch.reshape(batch_positive_samples_toTensor_for_test,
-        #                                     (test_size * sample_size * q_size, GCN_out_size))
-        # re_negative_samples_for_test = torch.reshape(batch_negative_samples_toTensor_for_test,
-        #                                     (test_size * sample_size * q_size, GCN_out_size))
-        # re_anchor_samples_for_test = torch.reshape(batch_anchor_samples_toTensor_for_test,
-        #                                   (test_size * sample_size * q_size, GCN_out_size))
         # output test loss
         #test_all_y_hat = test_all_y_hat.to(device)
         #test_reconstruct_degree = test_reconstruct_degree.to(device)
@@ -607,7 +489,7 @@ for i in np.arange(epoch):
         re_loss1 = l1_loss(test_reconstruct_degree, test_reconstruct_degree_from_query)
         re_loss2 = l1_loss(test_reconstruct_edges, test_reconstruct_edges_from_query)
         re_loss3 = l1_loss(test_reconstruct_nodes, test_reconstruct_nodes_from_query)
-        test_mean_adj_loss = torch.div(test_batch_adj_loss, test_size)
+        #test_mean_adj_loss = torch.div(test_batch_adj_loss, test_size)
         if args.train_type == 'both':
             if i < 100:  # 按batch算loss
                 test_loss = loss1
@@ -616,7 +498,7 @@ for i in np.arange(epoch):
         elif args.train_type == 'only label':
             test_loss = loss1
         elif args.train_type == 'only structure':
-            test_loss = 0.01 * trade_off_for_re1 * re_loss1 + 0.01 * trade_off_for_re2 * re_loss2 + 0.01 * trade_off_for_re3
+            test_loss = 0.01 * trade_off_for_re1 * re_loss1 + 0.01 * trade_off_for_re2 * re_loss2 + 0.01 * trade_off_for_re3 * re_loss3
         # test_loss = loss1
         # print('test_loss:  ', np.float(test_loss.detach()))
 
@@ -651,31 +533,33 @@ for i in np.arange(epoch):
         test_cluster_coefficient.append(mean_cluster_coefficient)
         plt_epoch.append(i)
         if (i + 1) % 50 == 0:
-            record_value('./model_value/deezer/', train_path, mean_similarity_value, mean_com_density,
+            record_value_path = './model_value/'+args.dataset+'/'
+            record_value(record_value_path, train_path, mean_similarity_value, mean_com_density,
                          mean_com_coreness, mean_com_nodes, mean_f1_score, mean_tpr, mean_diameter,
                          mean_cluster_coefficient)
     # update threshold
     epoch_coefficient = max(100 - i, 1)
-    # threshold = epoch_coefficient * max(0.5, ((1 - mean_cover_rate) * (1 - mean_similarity_value)))
     threshold = epoch_coefficient * 0.5
     print('threshold', threshold)
 
     # save model state
-    if save_model == True and (i + 1) % 100 == 0:
-        model_save_path = './model_save/GMN_for_cora/GMN_for_cora_' + str(i + 1) + '.pth'
+    if args.save_model == True and (i + 1) % 100 == 0:
+        model_save_path = './model_save/' + args.dataset + '/' + args.dataset + '_' + args.cs_perturbation + '_' +str(i + 1) + '.pth'
         torch.save(model.state_dict(), model_save_path)
 # record time
-record_time('./model_time/cora/', train_path, all_for_train_time, all_train_candidate_time, all_test_time,
+record_time_path = './model_time/' + args.dataset + '/'
+record_time(record_time_path, train_path, all_for_train_time, all_train_candidate_time, all_test_time,
             all_test_candidate_time)
 # plt
 plt.figure(1)
+save_plt_path = './model_plt/' + args.dataset + '/'
 # loss
 test_loss_line = plt.plot(plt_epoch, test_loss_record, 'r', lw=1)
 
 plt.legend()
 plt.xlabel('epoch')
 plt.ylabel('loss')
-plt.savefig('./model_plt/cora/loss.png')
+plt.savefig(save_plt_path + 'loss.png')
 plt.close()
 # plt.show()
 
@@ -687,7 +571,7 @@ plt.legend()
 # plt.ylim((0,1))
 plt.xlabel('epoch')
 plt.ylabel('community similarity')
-plt.savefig('./model_plt/cora/community_similarity.png')
+plt.savefig(save_plt_path + 'community_similarity.png')
 plt.close()
 # plt.show()
 
@@ -698,7 +582,7 @@ f1_score_line = plt.plot(plt_epoch, test_f1_score, 'g', lw=1, label='f1 score')
 plt.legend()
 plt.xlabel('epoch')
 plt.ylabel('f1 score')
-plt.savefig('./model_plt/cora/f1_score.png')
+plt.savefig(save_plt_path + 'f1_score.png')
 plt.close()
 # plt.show()
 
@@ -710,7 +594,7 @@ tpr_line = plt.plot(plt_epoch, test_tpr, 'g', lw=1, label='TPR')
 plt.legend()
 plt.xlabel('epoch')
 plt.ylabel('TPR')
-plt.savefig('./model_plt/cora/TPR.png')
+plt.savefig(save_plt_path + 'TPR.png')
 plt.close()
 # plt.show()
 
@@ -721,7 +605,7 @@ diameter_line = plt.plot(plt_epoch, test_diameter, 'g', lw=1, label='diameter')
 plt.legend()
 plt.xlabel('epoch')
 plt.ylabel('diameter')
-plt.savefig('./model_plt/cora/diameter.png')
+plt.savefig(save_plt_path + 'diameter.png')
 plt.close()
 # plt.show()
 
@@ -732,6 +616,6 @@ cluster_coefficient_line = plt.plot(plt_epoch, test_cluster_coefficient, 'g', lw
 plt.legend()
 plt.xlabel('epoch')
 plt.ylabel('cluster coefficient')
-plt.savefig('./model_plt/cora/cluster_coefficient.png')
+plt.savefig(save_plt_path + 'cluster_coefficient.png')
 plt.close()
 # plt.show()

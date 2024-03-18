@@ -96,7 +96,7 @@ def community_similarity(target_adj, query_adj):
     return first_measure * second_measure * third_measure
 
 
-def load_pubmed_data(train_size, test_size):
+def load_pubmed_data(train_size, test_size,train_path,test_path):
     raw_data = pd.read_csv('dataset/pubmed/pubmed.content', sep='\t', header=None)
     target_size = raw_data.shape[0]
     a = list(raw_data.index)
@@ -230,15 +230,15 @@ def load_pubmed_data(train_size, test_size):
     fin_labels = fin_labels.astype(np.float32)
     # print(type(fin_target_features[0][0][0]))
 
-    torch.save(fin_target_features, './dataset/for_train_pubmed/0_2/target_features.pt',
+    torch.save(fin_target_features, train_path + 'target_features.pt',
                pickle_protocol=pickle_protocol)
-    torch.save(fin_target_adjs, './dataset/for_train_pubmed/0_2/target_adj.pt',
+    torch.save(fin_target_adjs, train_path + 'target_adj.pt',
                pickle_protocol=pickle_protocol)
-    torch.save(fin_query_features, './dataset/for_train_pubmed/0_2/query_features.pt',
+    torch.save(fin_query_features, train_path + 'query_features.pt',
                pickle_protocol=pickle_protocol)
-    torch.save(fin_query_adjs, './dataset/for_train_pubmed/0_2/query_adj.pt',
+    torch.save(fin_query_adjs, train_path + 'query_adj.pt',
                pickle_protocol=pickle_protocol)
-    torch.save(fin_labels, './dataset/for_train_pubmed/0_2/labels.pt', pickle_protocol=pickle_protocol)
+    torch.save(fin_labels, train_path + 'labels.pt', pickle_protocol=pickle_protocol)
 
     # sample test data
     all_target_adjs = []
@@ -346,17 +346,17 @@ def load_pubmed_data(train_size, test_size):
     fin_labels = fin_labels.astype(np.float32)
     # print(type(fin_target_features[0][0][0]))
 
-    torch.save(fin_target_features, './dataset/for_test_pubmed/0_2/target_features.pt',
+    torch.save(fin_target_features, test_path + 'target_features.pt',
                pickle_protocol=pickle_protocol)
-    torch.save(fin_target_adjs, './dataset/for_test_pubmed/0_2/target_adj.pt',
+    torch.save(fin_target_adjs, test_path + 'target_adj.pt',
                pickle_protocol=pickle_protocol)
-    torch.save(fin_query_features, './dataset/for_test_pubmed/0_2/query_features.pt',
+    torch.save(fin_query_features, test_path + 'query_features.pt',
                pickle_protocol=pickle_protocol)
-    torch.save(fin_query_adjs, './dataset/for_test_pubmed/0_2/query_adj.pt',
+    torch.save(fin_query_adjs, test_path + 'query_adj.pt',
                pickle_protocol=pickle_protocol)
-    torch.save(fin_labels, './dataset/for_test_pubmed/0_2/labels.pt', pickle_protocol=pickle_protocol)
+    torch.save(fin_labels, test_path + 'labels.pt', pickle_protocol=pickle_protocol)
 
 
 train_size = 30
 test_size = 20
-load_pubmed_data(train_size, test_size)
+# load_pubmed_data(train_size, test_size)

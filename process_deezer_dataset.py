@@ -10,7 +10,7 @@ from sample_dataset import *
 pickle_protocol = 4
 
 
-def load_deezer_data(train_size, test_size):
+def load_deezer_data(train_size, test_size,train_path,test_path):
     raw_data = pd.read_csv('dataset/deezer/deezer.content', sep='\t', header=None)
     target_size = raw_data.shape[0]  # 样本点数28281
     a = list(raw_data.index)
@@ -103,7 +103,7 @@ def load_deezer_data(train_size, test_size):
         D_target = dgl.DGLGraph(target_graph, ntype='_N', etype='_E')  # 这个是有向图
         D_query = dgl.DGLGraph(query_graph, ntype='_N', etype='_E')
         path = save_graph_path + 'target_2w_query_mixed_' + str(i) + '.bin'
-        save_graphs(path, [D_target, D_query], graph_labels)
+        # save_graphs(path, [D_target, D_query], graph_labels)
 
         query_adj = nx.adjacency_matrix(query_graph).todense()
         target_adj = nx.adjacency_matrix(target_graph).todense()
@@ -135,11 +135,11 @@ def load_deezer_data(train_size, test_size):
     fin_labels = fin_labels.astype(np.float32)
     print(type(fin_target_features[0][0][0]))
 
-    torch.save(fin_target_features, './dataset/for_train_deezer/target_features.pt', pickle_protocol=pickle_protocol)
-    torch.save(fin_target_adjs, './dataset/for_train_deezer/target_adj.pt', pickle_protocol=pickle_protocol)
-    torch.save(fin_query_features, './dataset/for_train_deezer/query_features.pt', pickle_protocol=pickle_protocol)
-    torch.save(fin_query_adjs, './dataset/for_train_deezer/query_adj.pt', pickle_protocol=pickle_protocol)
-    torch.save(fin_labels, './dataset/for_train_deezer/labels.pt', pickle_protocol=pickle_protocol)
+    torch.save(fin_target_features, train_path + 'target_features.pt', pickle_protocol=pickle_protocol)
+    torch.save(fin_target_adjs, train_path + 'target_adj.pt', pickle_protocol=pickle_protocol)
+    torch.save(fin_query_features, train_path + 'query_features.pt', pickle_protocol=pickle_protocol)
+    torch.save(fin_query_adjs, train_path + 'query_adj.pt', pickle_protocol=pickle_protocol)
+    torch.save(fin_labels, train_path + 'labels.pt', pickle_protocol=pickle_protocol)
 
     # sample test data
     all_target_adjs = []
@@ -147,20 +147,23 @@ def load_deezer_data(train_size, test_size):
     all_target_features = []
     all_query_features = []
     all_labels = []
-    # component_number = len(all_connected_component_nodes)
-    # sampled_number = random.sample(range(component_number), test_size)
-    # print('sampled_number', sampled_number)
+    component_number = len(all_connected_component_nodes)
+    sampled_number = random.sample(range(component_number), test_size)
+    print('sampled_number', sampled_number)
     test_connected_component_nodes = []
     test_sampled_k = []
-    # for one in sampled_number:
-    while (len(test_sampled_k) < test_size):
-        component_number = len(all_connected_component_nodes)
-        sampled_number = random.sample(range(component_number), 1)
-        if all_sampled_k[sampled_number[0]] == 10 and len(all_connected_component_nodes[sampled_number[0]]) == 244:
-            print('all_sampled_k[sampled_number]', all_sampled_k[sampled_number[0]])
-            test_connected_component_nodes.append(all_connected_component_nodes[sampled_number[0]])
-            test_sampled_k.append(all_sampled_k[sampled_number[0]])
-    print('test_sampled_k', test_sampled_k)
+    for one in sampled_number:
+        test_connected_component_nodes.append(all_connected_component_nodes[one])
+        test_sampled_k.append(all_sampled_k[one])
+    # case
+    # while (len(test_sampled_k) < test_size):
+    #     component_number = len(all_connected_component_nodes)
+    #     sampled_number = random.sample(range(component_number), 1)
+    #     if all_sampled_k[sampled_number[0]] == 10 and len(all_connected_component_nodes[sampled_number[0]]) == 244:
+    #         print('all_sampled_k[sampled_number]', all_sampled_k[sampled_number[0]])
+    #         test_connected_component_nodes.append(all_connected_component_nodes[sampled_number[0]])
+    #         test_sampled_k.append(all_sampled_k[sampled_number[0]])
+    # print('test_sampled_k', test_sampled_k)
     for i in range(test_size):
         sampled_k = test_sampled_k[i]
         connected_component_nodes = test_connected_component_nodes[i]
@@ -243,13 +246,13 @@ def load_deezer_data(train_size, test_size):
     fin_labels = fin_labels.astype(np.float32)
     # print(type(fin_target_features[0][0][0]))
 
-    torch.save(fin_target_features, './dataset/for_case_deezer/target_features.pt', pickle_protocol=pickle_protocol)
-    torch.save(fin_target_adjs, './dataset/for_case_deezer/target_adj.pt', pickle_protocol=pickle_protocol)
-    torch.save(fin_query_features, './dataset/for_case_deezer/query_features.pt', pickle_protocol=pickle_protocol)
-    torch.save(fin_query_adjs, './dataset/for_case_deezer/query_adj.pt', pickle_protocol=pickle_protocol)
-    torch.save(fin_labels, './dataset/for_case_deezer/labels.pt', pickle_protocol=pickle_protocol)
+    torch.save(fin_target_features, test_path + 'target_features.pt', pickle_protocol=pickle_protocol)
+    torch.save(fin_target_adjs, train_path + 'target_adj.pt', pickle_protocol=pickle_protocol)
+    torch.save(fin_query_features, train_path + 'query_features.pt', pickle_protocol=pickle_protocol)
+    torch.save(fin_query_adjs, train_path + 'query_adj.pt', pickle_protocol=pickle_protocol)
+    torch.save(fin_labels, train_path + 'labels.pt', pickle_protocol=pickle_protocol)
 
 
 train_size = 30
 test_size = 1
-load_deezer_data(train_size, test_size)
+# load_deezer_data(train_size, test_size)
