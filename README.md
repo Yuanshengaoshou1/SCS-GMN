@@ -22,6 +22,7 @@ Datasets:
 
 - [Facebook](https://snap.stanford.edu/data/facebook-large-page-page-network.html)
 
+- [DBLP](https://snap.stanford.edu/data/com-DBLP.html)
 
 
 
