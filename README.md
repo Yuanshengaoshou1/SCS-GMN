@@ -24,6 +24,8 @@ Datasets:
 
 - [DBLP](https://snap.stanford.edu/data/com-DBLP.html)
 
+- [Reddit](https://snap.stanford.edu/graphsage/reddit.zip)
+
 
 
 ## Usage
