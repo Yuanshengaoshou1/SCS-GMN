@@ -61,7 +61,8 @@ python train.py --dataset cora
 After training SCS-GMN, you can perform similarity community search based on SCS-GMN using the following command. 
 
 ```
-python test.py --dataset cora --model_path './model_save/GMN_for_cora/GMN_for_cora_200.pth'
+python test.py --dataset cora --model_path './model_save/[graph name]/[graph name]_[lr]_both_200.pth' (The graph name can be any dataset)
+python test.py --dataset cora --model_path './model_save/cora/cora_0.1_both_200.pth'
 ```
 
 The results of the search can be found in the 'record' folder for evaluation of **effectiveness** and **efficiency**.
@@ -75,7 +76,7 @@ only label-based self-supervised loss, and only structural self-supervised loss.
 We validated the effectiveness of different methods using the following command:
 
 ```
-python train.py --dataset cora train_type both(both/only label/only structure,different training type determines the different loss term)
+python train.py --dataset cora --train_type both (both/only_label/only_structure, different training type determines the different loss term)
 ```
 
 ### Parameter Sensitivity
@@ -84,7 +85,7 @@ in dataset to study the impact of community similarity on SCS-GMN's
 performance over all dataset.(need to first obtain query graphs and target graphs under different community similarity thresholds, and then train the model)
 
 ```
-process_[graph name]_dataset_0_2.py(The graph name can be any dataset)
+process_[graph name]_dataset_[cs_perturbation].py (The graph name can be any dataset, the cs_perturbation can be 0.1/0.2/0.3)
 process_cora_dataset_0_2.py
 python train.py --dataset cora
 ```
@@ -103,6 +104,6 @@ python train.py --dataset cora
 | trade_off_for_re2 |  float   |        balance coefficient of the cohesiveness similariy loss        |
 | trade_off_for_re3 |  float   |           balance coefficient of the size similarity loss            |
 |      dataset      |   str    |                             dataset type                             |
-
+|  cs_perturbation  |  float   |     The perturbation between labeled communities <$C^*_l$,$C_l$>     |
 
 **The repository will be continuously updated**.
