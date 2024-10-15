@@ -3,6 +3,7 @@ import torch
 import networkx as nx
 from collections import Counter
 import math
+import dgl
 
 def remove_dumb_nodes(graph):
     remove = [node for node, degree in dict(graph.degree()).items() if degree == 0]
@@ -39,15 +40,15 @@ def normalize_for_commnunity_similarity(query_value, predict_value):
 
 def community_similarity(target_adj, query_adj, predict_result):
     # get query and target
-    target_adj = target_adj.cpu().numpy()
-    query_adj = query_adj.cpu().numpy()
-    target_adj_remove_self = target_adj - np.eye(target_adj.shape[0])
-    query_adj_remove_self = query_adj - np.eye(query_adj.shape[0])
-    target_graph = nx.from_numpy_array(target_adj_remove_self)
-    query_graph = nx.from_numpy_array(query_adj_remove_self)
+    # target_adj = target_adj.cpu().numpy()
+    # query_adj = query_adj.cpu().numpy()
+    # target_adj_remove_self = target_adj - np.eye(target_adj.shape[0])
+    # query_adj_remove_self = query_adj - np.eye(query_adj.shape[0])
+    # target_graph = nx.from_numpy_array(target_adj_remove_self)
+    # query_graph = nx.from_numpy_array(query_adj_remove_self)
+    query_graph = nx.Graph(dgl.to_networkx(query_adj.cpu()))
     query_graph_remove_dumb_nodes = remove_dumb_nodes(query_graph)
     query_adj_remove_dumb_nodes = nx.adjacency_matrix(query_graph_remove_dumb_nodes).todense()
-    query_adj_add_self = query_adj_remove_dumb_nodes + np.eye(query_adj_remove_dumb_nodes.shape[0])
 
     list_predict_result = predict_result[0].tolist()
     predict_nodes = []
@@ -56,9 +57,10 @@ def community_similarity(target_adj, query_adj, predict_result):
             predict_nodes.append(i)
     print('predict_nodes', predict_nodes)
     # extract predict subgraph
-    predict_subgraph = target_graph.subgraph(predict_nodes)
-    predict_sub_adj = target_adj[predict_nodes]
-    predict_adj = predict_sub_adj[:, predict_nodes]
+    predict_subgraph = nx.Graph(dgl.to_networkx(dgl.node_subgraph(target_adj,predict_nodes).cpu()))
+    # predict_subgraph = target_graph.subgraph(predict_nodes)
+    # predict_sub_adj = target_adj[predict_nodes]
+    # predict_adj = predict_sub_adj[:, predict_nodes]
 
     # 1st measure - avg degree
     query_degree = dict(nx.degree(query_graph_remove_dumb_nodes))
@@ -116,11 +118,13 @@ def community_similarity(target_adj, query_adj, predict_result):
     query_nodes_for_density = query_nodes
     query_edged_for_density = query_edges
     query_density = 2 * query_edged_for_density / (query_nodes_for_density * (query_nodes_for_density - 1))
-
+    # query_density = query_edged_for_density / query_nodes_for_density
+    
     predict_nodes_for_density = predict_nodes
     predict_edged_for_density = predict_edges
     predict_density = 2 * predict_edged_for_density / (
                 predict_nodes_for_density * (predict_nodes_for_density - 1) + 0.0001)
+    # predict_density = predict_edged_for_density / (predict_nodes_for_density  + 0.0001)
     # count measure
     constant = 0.01
     # first_measure = (2*predict_avg_degree*query_avg_degree + constant)/\
@@ -133,13 +137,22 @@ def community_similarity(target_adj, query_adj, predict_result):
 
     third_measure = (2 * predict_nodes * query_nodes + constant) / \
                     (pow(predict_nodes, 2) + pow(query_nodes, 2) + constant)
+    
+    # get coreness
+    min_query_coreness = min(list_query_coreness)
+    if len(predict_subgraph.nodes) == 0:
+        min_predict_coreness = 0
+    else:
+        min_predict_coreness = min(list_predict_coreness)
+    print('min_query_coreness',min_query_coreness,'min_predict_coreness',min_predict_coreness)
     print('query_density', query_density, 'predict_density', predict_density)
     print('query_avg_coreness', query_avg_coreness, 'predict_avg_coreness', predict_avg_coreness)
     print('query_nodes', query_nodes, 'predict_nodes', predict_nodes)
     print('first_measure', first_measure, 'second_measure', second_measure, 'third_measure', third_measure)
-    # return first_measure * second_measure * third_measure * fourth_measure,first_measure,second_measure,third_measure,fourth_measure
+    print('community similarity',first_measure*second_measure*third_measure)
+    # return first_measure * second_measure * third_measure ,first_measure,second_measure,third_measure
     return first_measure * second_measure * third_measure, first_measure, second_measure, third_measure, \
-           query_density, predict_density, query_avg_coreness, predict_avg_coreness, query_nodes, predict_nodes
+           query_density, predict_density, query_avg_coreness, predict_avg_coreness, query_nodes, predict_nodes,min_query_coreness,min_predict_coreness
 
 
 def found_more_than_threshold(predict_result, label):

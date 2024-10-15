@@ -179,7 +179,8 @@ def load_cora_data(train_size, test_size,train_path,test_path):
 
             # public
             if nx.is_connected(subsubgraph):
-                selected_nodes = sorted(list(nx.nodes(subsubgraph)))
+                # selected_nodes = sorted(list(nx.nodes(subsubgraph)))
+                selected_nodes = list(nx.nodes(subsubgraph))
                 query_features = target_features[selected_nodes]
                 query_graph = nx.convert_node_labels_to_integers(subsubgraph, first_label=0)
                 # supplement dumb nodes
@@ -202,7 +203,7 @@ def load_cora_data(train_size, test_size,train_path,test_path):
                     break
                 # label
         labels = np.zeros((1, target_size))
-        for node in connected_component_nodes:
+        for node in selected_nodes:
             labels[0][node] = 1
         # print(np.nonzero(labels))
         save_graph_path = './dataset/train_cora/'
@@ -293,7 +294,8 @@ def load_cora_data(train_size, test_size,train_path,test_path):
 
             # public
             if nx.is_connected(subsubgraph):
-                selected_nodes = sorted(list(nx.nodes(subsubgraph)))  # 对应原图的节点编号
+                # selected_nodes = sorted(list(nx.nodes(subsubgraph)))  # 对应原图的节点编号
+                selected_nodes = list(nx.nodes(subsubgraph))
                 query_features = target_features[selected_nodes]
                 query_graph = nx.convert_node_labels_to_integers(subsubgraph, first_label=0)
                 # supplement dumb nodes
@@ -316,7 +318,7 @@ def load_cora_data(train_size, test_size,train_path,test_path):
                     break
                 # label
         labels = np.zeros((1, target_size))
-        for node in connected_component_nodes:
+        for node in selected_nodes:
             labels[0][node] = 1
         # print(np.nonzero(labels))
         save_graph_path = './dataset/test_cora/'

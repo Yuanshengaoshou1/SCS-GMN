@@ -10,12 +10,14 @@ def get_k_core_distribution(graph):
     coreness = nx.core_number(graph)
     max_corenss = max(list(coreness.values()))
     coreness_distribution = [0] * (max_corenss+1)
-    low_bound_corenss = math.ceil(max_corenss * 0.7) #citeseer pubmed facebook deezer 0.7/cora 0.8
+    low_bound_corenss = math.ceil(max_corenss * 0.8) #citeseer pubmed facebook deezer 0.7/cora dblp 0.8
     for i in range(low_bound_corenss, max_corenss + 1):
+        print('k',i)
         core_graph = nx.k_core(graph, k=i)
         count = 0
         for j in nx.connected_components(core_graph):
             count = count + 1
+            print('len(j)',len(j))
         coreness_distribution[i] = count
     sum_coress = sum(coreness_distribution)
     nor_coreness_distribution = [item/sum_coress for item in coreness_distribution]

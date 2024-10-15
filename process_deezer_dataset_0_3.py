@@ -197,7 +197,7 @@ def load_deezer_data(train_size, test_size,train_path,test_path):
                     break
 
         labels = np.zeros((1, target_size))
-        for node in connected_component_nodes:
+        for node in selected_nodes:
             labels[0][node] = 1
         # print(np.nonzero(labels))
         save_graph_path = './dataset/train_deezer/'
@@ -317,7 +317,7 @@ def load_deezer_data(train_size, test_size,train_path,test_path):
                     print('get!')
                     break
         labels = np.zeros((1, target_size))
-        for node in connected_component_nodes:
+        for node in selected_nodes:
             labels[0][node] = 1
         # print(np.nonzero(labels))
         save_graph_path = './dataset/test_deezer/'
